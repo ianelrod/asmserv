@@ -8,48 +8,69 @@
 section .text
         global  _start
         extern  _conv
-        ; extern  _bind
+        extern  _error
         ; extern  _get
         ; extern  _post
 
-;request:                            ; request handler
-
-args:                               ; invalid args handler
-        mov     rax,1
-        mov     rdi,1
-        lea     rsi,[error1]        ; error message
-        mov     rdx,30
-        syscall                     ; write to stdout
-        mov     rdi,1               ; args exit code
-        jmp     _end
-
 _start:
-        mov     rax,[rsp]           ; arg pointer
+        mov     rax,[rbp-0x8]       ; arg pointer
         cmp     rax,3               ; check for 3 args
-        jne     args
-        mov     rdi,[rsp+16]        ; ip pointer
-        mov     rsi,[rsp+24]        ; port pointer
-        call    _conv               ; convert ip and port
-        mov     [rsp],rax           ; store ip/port
+        cmovne  rdi,1
+        jne     _end
 
-        mov     rax,41              ; syscall socket
+        lea     rdi,[rbp-0x18]      ; ip pointer (skip program name)
+        lea     rsi,[rbp-0x20]      ; port pointer
+        call    _conv               ; convert args to sockaddr_in struct
+
+main:
+        lea     rsp,[rbp-0x20]      ; new stack pointer
+        mov     [rbp-0x8],rax       ; unpack sockaddr_in to stack
+        xor     rax,rax
+        mov     [rbp-0x10],rax      ; sin_zero
+
+        mov     rax,41              ; operator socket
         mov     rdi,2               ; AF_INET
         mov     rsi,1               ; SOCK_STREAM
         mov     rdx,0               ; 0
         syscall
-        mov     rdi,rax             ; socket fd
-        movzx   rsi,dword [rsp]     ; ip address
-        movzx   rdx,word [rsp+4]    ; port number
-        call    _bind               ; bind to socket
-
+        cmp     rax,0               ; check for socket error
+        cmovl   rdi,3
+        jl      _end
+        mov     [rbp-0x12],ax       ; sockfd to stack
+        mov     rdi,rax
+        mov     rax,49              ; operator bind
+        lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
+        mov     rdx,16              ; sockaddr_in size
+        syscall
+        cmp     rax,0               ; check for bind error
+        cmovl   rdi,4
+        jl      _end
         mov     rax,50              ; operator listen
-        mov     rdi,rax             ; socket fd
+        mov     di,[rbp-0x12]       ; sockfd from stack
         mov     rsi,5               ; backlog
         syscall
+        cmp     rax,0               ; check for listen error
+        cmovl   rdi,5
+        jl      _end
+        mov     rax,1               ; operator write
+        mov     rdi,1
+        lea     rsi,[listen]        ; listen message
+        mov     rdx,30
+        syscall
+
+.listen:                            ; loop connections
+        mov     rax,43              ; operator accept
+        mov     di,[rbp-0x12]       ; sockfd from stack
+        lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
+        mov     rdx,16              ; sockaddr_in size
+        syscall
+
+        jmp     .listen
 
 _end:
+        call    _error
         mov     rax,60              ; operator exit
         syscall
 
 section .rodata
-error1: db      "Syntax: ./server [ip] [port]",0xa,0
+listen: db      "Listening for connections...",0xa,0
