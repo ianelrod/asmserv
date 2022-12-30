@@ -9,13 +9,13 @@ section .text
         global  _start
         extern  _conv
         extern  _error
-        ; extern  _get
-        ; extern  _post
+        extern  _get
+        extern  _post
 
 _start:
         mov     rax,[rbp-0x8]       ; arg pointer
         cmp     rax,3               ; check for 3 args
-        cmovne  rdi,1
+        mov     rcx,1
         jne     _end
 
         lea     rdi,[rbp-0x18]      ; ip pointer (skip program name)
@@ -34,7 +34,7 @@ main:
         mov     rdx,0               ; 0
         syscall
         cmp     rax,0               ; check for socket error
-        cmovl   rdi,3
+        mov     rcx,3
         jl      _end
         mov     [rbp-0x12],ax       ; sockfd to stack
         mov     rdi,rax
@@ -43,34 +43,56 @@ main:
         mov     rdx,16              ; sockaddr_in size
         syscall
         cmp     rax,0               ; check for bind error
-        cmovl   rdi,4
+        mov     rcx,4
         jl      _end
         mov     rax,50              ; operator listen
         mov     di,[rbp-0x12]       ; sockfd from stack
         mov     rsi,5               ; backlog
         syscall
         cmp     rax,0               ; check for listen error
-        cmovl   rdi,5
+        mov     rcx,5
         jl      _end
         mov     rax,1               ; operator write
         mov     rdi,1
-        lea     rsi,[listen]        ; listen message
+        lea     rsi,[lt_str]        ; listen message
         mov     rdx,30
         syscall
 
-.listen:                            ; loop connections
+listen:                             ; loop connections
         mov     rax,43              ; operator accept
         mov     di,[rbp-0x12]       ; sockfd from stack
         lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
         mov     rdx,16              ; sockaddr_in size
         syscall
+        mov     [rbp-0x14],ax       ; connfd to stack
+        mov     rax,0               ; operator read
+        mov     di,[rbp-0x14]
+        lea     rsi,[rbp-0x17]      ; char buffer
+        mov     rdx,1               ; read 1 byte
+        syscall
 
-        jmp     .listen
+        mov     al,[rbp-0x17]
+        cmp     al,'G'              ; check for GET
+        je      .get
+        cmp     al,'P'              ; check for POST
+        je      .post
+        jmp     .next
+
+.get:   call    _get
+        jmp     .next
+.post:  call    _post
+.next:  mov     rax,3               ; operator close
+        mov     di,[rbp-0x14]
+        syscall
+        jmp     listen
 
 _end:
+        mov     rdi,rcx             ; error code
+        cmp     rdi,0
+        je      .low
         call    _error
-        mov     rax,60              ; operator exit
+.low:   mov     rax,60              ; operator exit
         syscall
 
 section .rodata
-listen: db      "Listening for connections...",0xa,0
+lt_str: db      "Listening for connections...",0xa,0

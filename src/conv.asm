@@ -23,7 +23,7 @@ ip_aton:                        ; ip ascii to network byte order (rdi: ascii poi
         imul    rax,10          ; multiply accumulator by 10
         add     al,cl           ; add int to accumulator
         cmp     al,0xff
-        cmova   rdi,2
+        mov     rcx,2
         ja      _end            ; if accumulator > 255, error
         inc     rdi
         jmp     .top
@@ -44,7 +44,7 @@ pt_atoi:                        ; port ascii to integer (rdi: ascii pointer, rsi
         imul    rax,10          ; multiply accumulator by 10
         add     al,cl           ; add int to accumulator
         cmp     ax,0xffff
-        cmova   rdi,2
+        mov     rcx,2
         ja      _end            ; if accumulator > 65535, error
         inc     rdi
         jmp     .top

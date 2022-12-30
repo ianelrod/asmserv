@@ -9,14 +9,6 @@ section .text
         global  _error
         extern  _end
 
-exit:                               ; normal exit
-        mov     rax,1               ; operator write
-        mov     rdi,1
-        lea     rsi,[exit]          ; error message
-        mov     rdx,12
-        syscall
-        ret
-
 args:                               ; invalid args handler
         mov     rax,1
         mov     rdi,1
@@ -58,14 +50,24 @@ listen:                             ; listen error handler
         ret
 
 _error:
+        push    rbp
+        mov     rbp,rsp
+
+        push    QWORD [listen]
+        push    QWORD [bind]
+        push    QWORD [sock]
+        push    QWORD [param]
+        push    QWORD [args]
+
         push    rdi                 ; save exit code
-        call    [dict+rdi*8]
+        call    [rsp+(rdi+1)*8]
         pop     rdi
+
+        mov     rsp,rbp
+        pop     rbp
         ret
 
 section .rodata
-dict:   dq      [exit],[args],[param],[sock],[bind],[listen]
-exit:   db      "Exiting...",0xa,0
 error1: db      "Syntax: ./server [ip] [port]",0xa,0
 error2: db      "Error: Invalid IP or port",0xa,0
 error3: db      "Error: Socket error",0xa,0
