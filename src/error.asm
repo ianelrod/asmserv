@@ -53,14 +53,19 @@ _error:
         push    rbp
         mov     rbp,rsp
 
-        push    QWORD [listen]
-        push    QWORD [bind]
-        push    QWORD [sock]
-        push    QWORD [param]
-        push    QWORD [args]
+        lea     rax,[listen]
+        push    rax
+        lea     rax,[bind]
+        push    rax
+        lea     rax,[sock]
+        push    rax
+        lea     rax,[param]
+        push    rax
+        lea     rax,[args]
+        push    rax
 
         push    rdi                 ; save exit code
-        call    [rsp+(rdi+1)*8]
+        call    [8*rdi+rsp]
         pop     rdi
 
         mov     rsp,rbp

@@ -28,5 +28,7 @@ Future ideas:
 nasm -f elf64 -o obj/main.o src/main.asm
 nasm -f elf64 -o obj/error.o src/error.asm
 nasm -f elf64 -o obj/conv.o src/conv.asm
-ld -o bin/asmserv obj/main.o obj/error.o obj/conv.o
+nasm -f elf64 -o obj/get.o src/get.asm
+nasm -f elf64 -o obj/post.o src/post.asm
+ld -o bin/asmserv obj/main.o obj/error.o obj/conv.o obj/get.o obj/post.o
 ```

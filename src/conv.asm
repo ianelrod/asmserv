@@ -13,7 +13,7 @@ ip_aton:                        ; ip ascii to network byte order (rdi: ascii poi
         xor     rax,rax
         xor     rbx,rbx
         mov     bl,4            ; set loop counter
-.top:   xor     cl,cl
+.top:   xor     rcx,rcx
         mov     cl,[rdi]        ; load char
         cmp     cl,'0'          ; if below ascii 0, done
         jb      .done
@@ -22,9 +22,7 @@ ip_aton:                        ; ip ascii to network byte order (rdi: ascii poi
         sub     cl,'0'
         imul    rax,10          ; multiply accumulator by 10
         add     al,cl           ; add int to accumulator
-        cmp     al,0xff
-        mov     rcx,2
-        ja      _end            ; if accumulator > 255, error
+        jo      _end            ; if accumulator > 255, error
         inc     rdi
         jmp     .top
 .next:  mov     [rsi],al        ; store & clear accumulator
@@ -36,18 +34,21 @@ ip_aton:                        ; ip ascii to network byte order (rdi: ascii poi
 
 pt_atoi:                        ; port ascii to integer (rdi: ascii pointer, rsi: integer pointer)
         xor     rax,rax
-.top:   xor     cl,cl
+        xor     rbx,rbx
+        mov     bl,5            ; set failsafe
+.top:   xor     rcx,rcx
+        xor     rdx,rdx
         mov     cl,[rdi]        ; load char
         cmp     cl,0            ; if null, done
-        jb      .done
+        je      .done
         sub     cl,'0'
         imul    rax,10          ; multiply accumulator by 10
-        add     al,cl           ; add int to accumulator
-        cmp     ax,0xffff
-        mov     rcx,2
-        ja      _end            ; if accumulator > 65535, error
+        movzx   dx,cl
+        add     ax,dx           ; add int to accumulator
+        jo      _end            ; if accumulator > 65535, error
         inc     rdi
-        jmp     .top
+        dec     bl
+        jnz     .top
 .done:  mov     si,ax
         mov     [rbp-0x14],si   ; store accumulator
         ret
@@ -63,6 +64,7 @@ _conv:
         mov     rbp,rsp
         sub     rsp,0x18
 
+        mov     r12,2           ; set code if error occurs
         mov     [rbp-0x8],rdi   ; store ip pointer
         mov     [rbp-0x10],rsi  ; store port pointer
         lea     rsi,[rbp-0x18]  ; ip network byte order
