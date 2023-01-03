@@ -25,8 +25,8 @@ _start:
 main:
         mov     rsp,rbp             ; new stack pointer
         sub     rsp,0x20
-        int3
-        mov     [rbp-0x8],rax       ; unpack sockaddr_in to stack
+        
+        mov     QWORD [rbp-0x8],rax ; unpack sockaddr_in to stack
         xor     rax,rax
         mov     [rbp-0x10],rax      ; sin_zero
 
