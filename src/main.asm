@@ -14,17 +14,21 @@ section .text
 
 _start:
         mov     rax,[rsp]           ; arg value
-        cmp     rax,3               ; check for 3 args
         mov     r12,1
+        cmp     rax,3               ; check for 3 args
         jne     _end
 
-        lea     rdi,[rsp+0x10]      ; ip pointer (skip program name)
-        lea     rsi,[rsp+0x18]      ; port pointer
+        mov     rdi,[rsp+0x10]      ; take pointer ip str
+        mov     rsi,[rsp+0x18]      ; take pointer port str
         call    _conv               ; convert args to sockaddr_in struct
+        add     rsp,0x18            ; clear shell args
 
 main:
-        mov     rsp,rbp             ; new stack pointer
+        push    rbp
+        mov     rbp,rsp
         sub     rsp,0x20
+
+        int3
         
         mov     QWORD [rbp-0x8],rax ; unpack sockaddr_in to stack
         xor     rax,rax
@@ -35,8 +39,8 @@ main:
         mov     rsi,1               ; SOCK_STREAM
         mov     rdx,0               ; 0
         syscall
-        cmp     rax,0               ; check for socket error
         mov     r12,3
+        cmp     rax,0               ; check for socket error
         jl      _end
         mov     [rbp-0x12],ax       ; sockfd to stack
         mov     rdi,rax
@@ -44,15 +48,15 @@ main:
         lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
         mov     rdx,16              ; sockaddr_in size
         syscall
-        cmp     rax,0               ; check for bind error
         mov     r12,4
+        cmp     rax,0               ; check for bind error
         jl      _end
         mov     rax,50              ; operator listen
         mov     di,[rbp-0x12]       ; sockfd from stack
         mov     rsi,5               ; backlog
         syscall
-        cmp     rax,0               ; check for listen error
         mov     r12,5
+        cmp     rax,0               ; check for listen error
         jl      _end
         mov     rax,1               ; operator write
         mov     rdi,1
