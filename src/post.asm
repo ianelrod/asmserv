@@ -3,6 +3,7 @@
 ; Author: Ian Goforth
 ; 
 ; POST Request Handler
+; Only one security rule: Do not allow path traversal
 ; -----------------------------------------
 
 section .text

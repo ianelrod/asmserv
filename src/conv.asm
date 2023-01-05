@@ -9,18 +9,23 @@ section .text
         global  _conv
         extern  _end
 
-ip_aton:                            ; ip ascii to network byte order (rdi: ascii pointer, rsi: network byte order pointer)
+ip_aton:                            ; ip ascii to network byte order
+; rax: accumulator
+; rdi: ascii pointer
+; rsi: network byte order pointer
+; rcx: loop counter
+; rdx: general purpose
         xor     rax,rax
-        xor     rbx,rbx
+        xor     rcx,rcx
         mov     DWORD [rsi],eax     ; init with 0s
-        mov     bl,4                ; set loop counter
-.top:   xor     rcx,rcx
-        mov     cl,BYTE [rdi]       ; load char
-        cmp     cl,'0'
+        mov     cl,4                ; set loop counter
+.top:   xor     rdx,rdx
+        mov     dl,BYTE [rdi]       ; load char
+        cmp     dl,'0'
         jb      .next               ; if not number, next
-        sub     cl,'0'
+        sub     dl,'0'
         imul    ax,10               ; multiply accumulator by 10
-        add     al,cl               ; add int to accumulator
+        add     al,dl               ; add int to accumulator
         jo      _end                ; if accumulator > 255, error
         inc     rdi
         jmp     .top
@@ -28,22 +33,25 @@ ip_aton:                            ; ip ascii to network byte order (rdi: ascii
         xor     al,al
         inc     rsi
         inc     rdi
-        dec     bl
+        dec     cl
         jnz     .top
         ret
 
-pt_atoi:                            ; port ascii to integer (rdi: ascii pointer, rsi: integer pointer)
+pt_atoi:                            ; port ascii to integer
+; rax: accumulator
+; rdi: ascii pointer
+; rsi: integer pointer
+; rcx: general purpose
+; rdx: general purpose
         xor     rax,rax
-        xor     rbx,rbx
         mov     WORD [rsi],ax       ; init with 0s
 .top:   xor     rcx,rcx
         xor     rdx,rdx
-        mov     cl,BYTE [rdi]       ; load char
-        cmp     cl,'0'              ; if below ascii 0, done
+        movzx   dx,BYTE [rdi]       ; load char
+        cmp     dx,'0'              ; if below ascii 0, done
         jb      .done
-        sub     cl,'0'
+        sub     dx,'0'
         imul    ax,10               ; multiply accumulator by 10
-        movzx   dx,cl
         add     ax,dx               ; add int to accumulator
         jo      _end                ; if accumulator > 65535, error
         inc     rdi
@@ -51,7 +59,8 @@ pt_atoi:                            ; port ascii to integer (rdi: ascii pointer,
 .done:  mov     WORD [rsi],ax       ; store accumulator
         ret
 
-pt_htons:                           ; port integer to network byte order (rdi: pointer to use)
+pt_htons:                           ; port integer to network byte order
+; rdi: pointer
         xor     rax,rax
         mov     ax,WORD [rdi]       ; load port integer
         xchg    al,ah               ; swap bytes
@@ -63,7 +72,7 @@ _conv:
         mov     rbp,rsp
         sub     rsp,0x18
 
-        mov     r12,2               ; set code if error occurs
+        inc     r12                 ; conversion error: 2        
         mov     [rbp-0x8],rdi       ; store pointer ip str
         mov     [rbp-0x10],rsi      ; store pointer port str
         lea     rsi,[rbp-0x18]      ; make pointer ip network byte order

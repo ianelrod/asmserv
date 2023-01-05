@@ -2,7 +2,7 @@
 
 of my old assembly web server found here: https://github.com/igoforth/codesamples/blob/master/x86-64/getpostserver.s
 
-The vision is to create an x86-64 web server that can handle GET and POST requests.
+The vision is to create an x86_64 web server that can handle GET and POST requests.
 
 Objectives:
 1. Lightweight
@@ -17,8 +17,9 @@ The program does not use:
 - libc
 
 Constraints:
-- Handle GET requests up to 8KB
-- Handle POST requests of up to 2GB
+- Handle GET/POST requests up to 1KB (Serve up to 2GB)
+- Will not parse url encoding
+- Will not do directory traversal
 
 Future ideas:
 - Handle SIGINT to exit gracefully
@@ -30,5 +31,6 @@ nasm -f elf64 -o obj/error.o src/error.asm
 nasm -f elf64 -o obj/conv.o src/conv.asm
 nasm -f elf64 -o obj/get.o src/get.asm
 nasm -f elf64 -o obj/post.o src/post.asm
-ld -o bin/asmserv obj/main.o obj/error.o obj/conv.o obj/get.o obj/post.o
+nasm -f elf64 -o obj/404.o src/404.asm
+ld -o bin/asmserv obj/main.o obj/error.o obj/conv.o obj/get.o obj/post.o obj/404.o
 ```

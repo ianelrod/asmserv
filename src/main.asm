@@ -14,8 +14,9 @@ section .text
 
 _start:
         mov     rax,[rsp]           ; arg value
-        mov     r12,1
         cmp     rax,3               ; check for 3 args
+        ; according to convention, we can assume r12 is not changed by callee, so we use it to keep track of error codes (could also use rbx?)
+        mov     r12,1               ; arguments error: 1
         jne     _end
 
         mov     rdi,[rsp+0x10]      ; take pointer ip str
@@ -27,8 +28,6 @@ main:
         push    rbp
         mov     rbp,rsp
         sub     rsp,0x20
-
-        int3
         
         mov     QWORD [rbp-0x8],rax ; unpack sockaddr_in to stack
         xor     rax,rax
@@ -39,8 +38,8 @@ main:
         mov     rsi,1               ; SOCK_STREAM
         mov     rdx,0               ; 0
         syscall
-        mov     r12,3
         cmp     rax,0               ; check for socket error
+        inc     r12                 ; socket error: 3
         jl      _end
         mov     [rbp-0x12],ax       ; sockfd to stack
         mov     rdi,rax
@@ -48,15 +47,15 @@ main:
         lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
         mov     rdx,16              ; sockaddr_in size
         syscall
-        mov     r12,4
         cmp     rax,0               ; check for bind error
+        inc     r12                 ; bind error: 4
         jl      _end
         mov     rax,50              ; operator listen
         mov     di,[rbp-0x12]       ; sockfd from stack
         mov     rsi,5               ; backlog
         syscall
-        mov     r12,5
         cmp     rax,0               ; check for listen error
+        inc     r12                 ; listen error: 5
         jl      _end
         mov     rax,1               ; operator write
         mov     rdi,1
@@ -64,7 +63,7 @@ main:
         mov     rdx,30
         syscall
 
-listen:                             ; loop connections
+listen: ; loop connections
         mov     rax,43              ; operator accept
         mov     di,[rbp-0x12]       ; sockfd from stack
         lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
@@ -78,6 +77,7 @@ listen:                             ; loop connections
         syscall
 
         mov     al,[rbp-0x17]
+        mov     di,[rbp-0x14]       ; arg1: connfd
         cmp     al,'G'              ; check for GET
         je      .get
         cmp     al,'P'              ; check for POST
@@ -93,11 +93,9 @@ listen:                             ; loop connections
         jmp     listen
 
 _end:
-        mov     rdi,r12             ; we're treating r12 as the error register, save before syscall
-        cmp     rdi,0
-        je      .low
         call    _error
-.low:   mov     rax,60              ; operator exit
+        mov     rdi,rax             ; transfer error to rdi
+        mov     rax,60              ; operator exit
         syscall
 
 section .rodata
