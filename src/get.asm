@@ -125,6 +125,11 @@ _get:
         syscall
 
         ; read from path up to 8192
+        xor     rcx,rcx
+        mov     rdx,8192
+        mov     rsi,32
+        mov     rdi,[rbp-0x2]
+        call    rd_cd
         cmp     rax,0
         jl      .end
         ; clear buffer of rest

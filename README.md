@@ -17,7 +17,8 @@ The program does not use:
 - libc
 
 Constraints:
-- Handle GET/POST requests up to 1KB (Serve up to 2GB)
+- Will GET/POST content up to 2GB
+- Handle file names up to 255B, linux max
 - Will not parse url encoding
 - Will not do directory traversal
 

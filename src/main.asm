@@ -70,29 +70,20 @@ listen: ; loop connections
         mov     rdx,16              ; sockaddr_in size
         syscall
         mov     [rbp-0x14],ax       ; connfd to stack
-        mov     rax,0               ; operator read
-        mov     di,[rbp-0x14]
-        lea     rsi,[rbp-0x17]      ; char buffer
-        mov     rdx,1               ; read 1 byte
+        mov     rax,57              ; operator fork
         syscall
-
-        mov     al,[rbp-0x17]
-        mov     di,[rbp-0x14]       ; arg1: connfd
-        cmp     al,'G'              ; check for GET
-        je      .get
-        cmp     al,'P'              ; check for POST
-        je      .post
-        jmp     .next
-
-.get:   call    _get
-        jmp     .next
-.post:  call    _post
+        mov     di,[rbp-0x14]       ; connfd from stack
+        cmp     rax,0
+        jg      .next
+.handle:call    _handle
+        mov     r12,0
+        jmp     _end
 .next:  mov     rax,3               ; operator close
-        mov     di,[rbp-0x14]
         syscall
         jmp     listen
 
 _end:
+        mov     rax,r12             ; transfer error to rax
         call    _error
         mov     rdi,rax             ; transfer error to rdi
         mov     rax,60              ; operator exit
