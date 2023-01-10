@@ -20,7 +20,13 @@ Constraints:
 - Will GET/POST content up to 2GB
 - Handle file names up to 255B, linux max
 - Will not parse url encoding
-- Will not do directory traversal
+
+Forbidden
+In paths:
+- Spaces " " (0x20) (By nature of the program, this will just break things)
+- More than one dot "." (0x2E)
+- More than one forward slash "/" (0x2F)
+- Bad ASCII bytes \:*?%"<>| (0x5C 0x3A 0x2A 0x3F 0x22 0x3C 0x3E 0x7C)
 
 Future ideas:
 - Handle SIGINT to exit gracefully

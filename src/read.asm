@@ -3,23 +3,23 @@
 ; Author: Ian Goforth
 ; 
 ; Secure file descriptor reader
+; This shit is voodoo
 ; -----------------------------------------
 
 section .text
         global  _read
-        global  _buf
-        extern  _end
+        extern  _verify
 
-rw:     ; print a read warning to stdout
-        mov     rax,1
+        ; print a read warning to stdout
+rw:     mov     rax,1
         mov     rdi,1
         lea     rsi,[rws]
         mov     rdx,30
         syscall
         jmp     fin
 
-ae:     ; print an alignment error to stdout
-        mov     rax,1
+        ; print an alignment error to stdout
+ae:     mov     rax,1
         mov     rdi,1
         lea     rsi,[aes]
         mov     rdx,31
@@ -63,8 +63,8 @@ align:  ; this subroutine brings all bytes from offset to null to front of buffe
         lea     rdi,[_buf+r9b]
         rep stosb                   ; zero rest of buffer
 
-.dna:   ; epilogue
-        pop     rcx,rcx
+        ; epilogue
+.dna:   pop     rcx,rcx
         pop     rdi,rdi
         pop     rax,rax
         ret
@@ -126,7 +126,6 @@ take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
         pop     r9
         pop     r8
         ret
-        ret
 
 seek:   ; this subroutine reads from buffer from offset to delimiter or null
 ; rsi: delimiter
@@ -158,7 +157,9 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 ; rdi:  file descriptor
 ; rsi:  delimiter
 ; rdx:  options
-; 0001: security
+; 0001  security
+; Security is only necessary if reading from a socket, not a file.
+; In this case, we can trust that the fd is a socket fd
 ; r8:   general register
 ; r9:   general register
         ; prologue
@@ -183,14 +184,19 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 
 .top:   call    take                ; read from fd
         cmp     rax,0
-        jle     warn                ; if read error, warn
+        jle     rw                  ; if read error, warn
         cmp     rdx,1
-        jne     .dnv                ; do not verify
-        call    _verify
-.dnv:   call    seek                ; find delimiter
+        jl      .dnv                ; do not verify
 
-        ; compare for delimiter or fullness
-        call    check
+        ; verify
+        lea     rdi,[_buf]
+        mov     rsi,WORD [rbp-0x2]  ; delimiter
+        call    _verify
+        mov     rdx,3               ; keep verify state
+        mov     BYTE [rbp-0x4],rdx
+
+.dnv:   call    seek                ; find delimiter
+        call    check               ; check buffer for delimiter or fullness
         and     rax,3
         jz      .top
 

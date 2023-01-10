@@ -9,8 +9,8 @@ section .text
         global  _fof
         extern  _end
 
-_fof:
-        ; rdi: socket
+_fof:   ; respond to socket with 404
+; rdi: socket
         push    rdi
         mov     rax,0
         mov     rsi,0               ; dump socket

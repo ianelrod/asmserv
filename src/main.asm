@@ -9,8 +9,7 @@ section .text
         global  _start
         extern  _conv
         extern  _error
-        extern  _get
-        extern  _post
+        extern  _handle
 
 _start:
         mov     rax,[rsp]           ; arg value
