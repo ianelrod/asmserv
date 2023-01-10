@@ -21,8 +21,7 @@ Constraints:
 - Handle file names up to 255B, linux max
 - Will not parse url encoding
 
-Forbidden
-In paths:
+Forbidden in paths:
 - Spaces " " (0x20) (By nature of the program, this will just break things)
 - More than one dot "." (0x2E)
 - More than one forward slash "/" (0x2F)
