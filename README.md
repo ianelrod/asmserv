@@ -9,12 +9,9 @@ Objectives:
 2. Elegant
 3. Reliable
 
-The program does use:
-- NASM syntax
-- IPv4
-
 The program does not use:
 - libc
+- IPv6
 
 Constraints:
 - Will GET/POST content up to 2GB
