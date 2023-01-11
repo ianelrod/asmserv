@@ -85,7 +85,12 @@ _verify:; verify will compare bytes from offset up to MAX_READ against an array 
 ; 0001 flush
 ; rdi: buffer pointer
 ; rsi: socket fd
-; rdx: options / general register
+; dh:  offset
+; dl:  handle + read state
+; 0000 0001 read security (1)
+; 0000 0010 keep verify   (2)
+; 0000 0100 read not done (4)
+; 0000 1000 none          (8)
 ; rcx: loop counter
         ; prologue
         push    rbp
@@ -99,24 +104,23 @@ _verify:; verify will compare bytes from offset up to MAX_READ against an array 
         mov     BYTE [rbp-0xb],rdx  ; options
 
         ; flush r1
-        cmp     dl,3
-        jne     .dnf
+        bt      dx,1
+        jnc     .dnf
         call    flush
 
         ; body
-.dnf:   xor     rdx,rdx
-        mov     dl,[rdi-1]          ; offset
-        mov     cl,32
-.itop:  mov     sil,[rdi+dl]        ; offset buffer value
+.dnf:   mov     cl,32
+.itop:  mov     sil,[rdi+dh]        ; offset buffer value
         mov     r8b,sil
         call    r1
         call    r2
-.ibot:  inc     dl
+.ibot:  inc     dh
         dec     cl
         cmp     cl,0                ; MAX_READ reached?
         jne     .itop
 
-.done:  ; epilogue
+        ; epilogue
+.done:  mov     rdx,BYTE [rbp-0xb]  ; options
         pop     rcx
         mov     rsp,rbp
         pop     rbp

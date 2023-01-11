@@ -4,6 +4,7 @@
 ; 
 ; Secure file descriptor reader
 ; This shit is voodoo
+; Java's BufferedReader with extra steps
 ; -----------------------------------------
 
 section .text
@@ -16,7 +17,7 @@ rw:     mov     rax,1
         lea     rsi,[rws]
         mov     rdx,30
         syscall
-        jmp     fin
+        jmp     end
 
         ; print an alignment error to stdout
 ae:     mov     rax,1
@@ -24,7 +25,7 @@ ae:     mov     rax,1
         lea     rsi,[aes]
         mov     rdx,31
         syscall
-        jmp     fin
+        jmp     end
 
 align:  ; this subroutine brings all bytes from offset to null to front of buffer
 ; we are considering the potential that we read more into the buffer than it takes to find the delimiter (specified by the offset), so we save the extra content past offset for the next read
@@ -40,7 +41,7 @@ align:  ; this subroutine brings all bytes from offset to null to front of buffe
         xor     r10,r10
 
         ; body
-        mov     r10b,BYTE [_buf-1]
+        mov     r10b,dh
         lea     r9,[_buf]
         cmp     r10b,0xff
         je      .zero               ; if buffer is full, just zero it
@@ -53,7 +54,7 @@ align:  ; this subroutine brings all bytes from offset to null to front of buffe
         jmp     .top
 .zero:  lea     r8,[_buf]
         sub     r9,r8
-        mov     BYTE [_buf-1],r9b   ; new offset
+        mov     dh,r9b              ; new offset
         mov     r8b,254
         sub     r8b,r9b
 
@@ -74,6 +75,7 @@ check:  ; this subroutine checks conditions below for alignment
 ; OR
 ; The offset value is delimiter
 ; rax: 0 none, 1 full buffer, 2 delimiter, 3 both
+; dh:  offset
 ; r8:  general register
 ; r9:  general register
         ; prologue
@@ -86,11 +88,11 @@ check:  ; this subroutine checks conditions below for alignment
         sub     r9b,32              ; BUF_SIZE - MAX_READ
 
         ; check for full buffer
-        mov     r8b,BYTE [_buf-1]    ; offset
+        mov     r8b,dh              ; offset
         cmp     r8b,r9b
         jge     .buf
 .next:  ; check for delimiter
-        mov     r8b,BYTE [_buf+r8b]  ; offset buffer value
+        mov     r8b,BYTE [_buf+r8b] ; offset buffer value
         jnz     .del
 
         ; actions
@@ -110,6 +112,9 @@ take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
         ; prologue
         push    r8
         push    r9
+        push    rdi
+        push    rsi
+        push    rdx
         xor     r8,r8
         xor     r9,r9
         
@@ -117,12 +122,15 @@ take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
         mov     rax,0
         mov     rdi,WORD [rbp-0x2]
         xor     r8,r8
-        mov     r8,BYTE [_buf-1]
+        mov     r8b,dh
         lea     rsi,[_buf+r8]
         mov     rdx,32
         syscall
         
         ; epilogue
+        pop     rdx
+        pop     rsi
+        pop     rdi
         pop     r9
         pop     r8
         ret
@@ -138,7 +146,7 @@ seek:   ; this subroutine reads from buffer from offset to delimiter or null
         xor     r9,r9
 
         ; delimiter comparison loop
-        mov     r8b,[_buf-1]
+        mov     r8b,dh
 .top:   mov     r9b,[_buf+r8b]
         jz      .done
         cmp     r9b,sil
@@ -156,8 +164,12 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 ; rax:  [buf]
 ; rdi:  file descriptor
 ; rsi:  delimiter
-; rdx:  options
-; 0001  security
+; dh:  offset
+; dl:  handle + read state
+; 0000 0001 read security (1)
+; 0000 0010 keep verify   (2)
+; 0000 0100 read not done (4)
+; 0000 1000 none          (8)
 ; Security is only necessary if reading from a socket, not a file.
 ; In this case, we can trust that the fd is a socket fd
 ; r8:   general register
@@ -165,7 +177,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         ; prologue
         push    rbp
         mov     rbp,rsp
-        sub     rsp,4
+        sub     rsp,0x4
         push    r10
 
         ; local variables
@@ -174,7 +186,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         mov     BYTE [rbp-0x4],rdx  ; options
         
         ; prepare function
-        mov     [_buf+254],0        ; zero null
+        mov     [_buf+255],0        ; zero null
         call    check               ; check alignment
         cmp     rax,0
         je      .top
@@ -185,14 +197,14 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 .top:   call    take                ; read from fd
         cmp     rax,0
         jle     rw                  ; if read error, warn
-        cmp     rdx,1
-        jl      .dnv                ; do not verify
+        bt      dx,0
+        jnc     .dnv                ; do not verify
 
         ; verify
         lea     rdi,[_buf]
         mov     rsi,WORD [rbp-0x2]  ; delimiter
         call    _verify
-        mov     rdx,3               ; keep verify state
+        bts     dx,1                ; keep verify state
         mov     BYTE [rbp-0x4],rdx
 
 .dnv:   call    seek                ; find delimiter
@@ -201,7 +213,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         jz      .top
 
         ; epilogue
-fin:    lea     rax,[_buf]
+end:    lea     rax,[_buf]
         pop     r10
         mov     rsp,rbp
         pop     rbp
@@ -212,6 +224,5 @@ rws:    db      "Warning: Read returned error",0xa,0
 aes:    db      "Error: Unexpected char in buf",0xa,0
 
 section .bss
-        resb    1                   ; offset
-_buf:   resb    254                 ; buffer
+_buf:   resb    255                 ; buffer
         resb    1                   ; null

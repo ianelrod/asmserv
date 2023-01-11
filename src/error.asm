@@ -54,3 +54,5 @@ error4: db      "Error: Bind error",0xa,0
         times 32-$+error4 db 0
 error5: db      "Error: Listen error",0xa,0
         times 32-$+error5 db 0
+error6: db      "Error: Invalid request method",0xa,0
+        times 32-$+error5 db 0

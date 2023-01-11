@@ -1,22 +1,35 @@
-AS=nasm # Assembly compiler
-ASFLAGS=-f elf64
-LD=ld # Linker
-LDFLAGS=-m 
-SOURCES=$(wildcard ./src/*.c)
-OBJECTS=$(SOURCES:.asm=.o) # Object files
-EXECUTABLE=asmserv
+# -----------------------------------------
+# 64-bit program that handles HTTP requests
+# Author: Ian Goforth
+# 
+# A 3-second Makefile
+# -----------------------------------------
 
-# Check version
-all: $(SOURCES) $(EXECUTABLE)
+TARGET	= asmserv
+AS		= nasm
+ASFLAGS = -f elf64
+LD		= ld
 
-# Create executable
-$(EXECUTABLE): $(OBJECTS) 
-	$(LD) $(LDFLAGS) $(OBJECTS) -o $@
+SRCDIR  = src
+OBJDIR  = obj
+BINDIR  = bin
 
-# Compile assembly program
-$(OBJECTS): $(SOURCES)
-	$(AS) $(ASFLAGS) $(SOURCES)
+SRCS    := $(wildcard $(SRCDIR)/*.asm)
+OBJS    := $(SRCS:$(SRCDIR)/%.asm=$(OBJDIR)/%.o)
+rm       = rm -f
+
+$(BINDIR)/$(TARGET): $(OBJS)
+	@mkdir -p $(@D)
+	@$(LD) -o $@ $(OBJS)
+
+$(OBJS): $(OBJDIR)/%.o : $(SRCDIR)/%.asm
+	@mkdir -p $(@D)
+	@$(AS) $(ASFLAGS) -o $@
  
-# Clean folder
+.PHONY: clean
 clean:
-	rm -rf *o $(EXECUTABLE)
+	@$(rm) $(OBJS)
+
+.PHONY: remove
+remove: clean
+	@$(rm) $(BINDIR)/$(TARGET)
