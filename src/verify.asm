@@ -20,17 +20,17 @@ flush:  ; verify is acting on a new string, so we must reset r1
 
         ; body
         lea     r8,[r1]
-.top:   mov     r10,BYTE [r8]
+.top:   mov     r10b,BYTE [r8]
         cmp     r10b,r9b
         je      .done
-        mov     BYTE [r8+1],r9
+        mov     BYTE [r8+1],r9b
         add     r8,2
         jmp     .top
 
         ; epilogue
 .done:  ret
 
-r1:     ; check byte against rule 1
+checkr1:; check byte against rule 1
 ; r8:  byte
 ; r9:  byte pointer
 ; r10: general register
@@ -40,7 +40,7 @@ r1:     ; check byte against rule 1
 
         ; body
         lea     r9,[r1]
-.top:   mov     r10,BYTE [r9]
+.top:   mov     r10b,BYTE [r9]
         cmp     r10b,0
         je      .done
         cmp     r8b,r10b
@@ -48,17 +48,17 @@ r1:     ; check byte against rule 1
 .next:  add     r9,2
         jmp     .top
 
-.error: mov     r10,BYTE [r9+1]
+.error: mov     r10b,BYTE [r9+1]
         cmp     r10b,0
         jne     _fof
         inc     r10b
-        mov     BYTE [r9+1],r10
+        mov     BYTE [r9+1],r10b
         jmp     .next
 
         ; epilogue
 .done:  ret
 
-r2:     ; check byte against rule 2
+checkr2:; check byte against rule 2
 ; r8:  byte
 ; r9:  byte pointer
 ; r10: general register
@@ -68,7 +68,7 @@ r2:     ; check byte against rule 2
 
         ; body
         lea     r9,[r2]
-.top:   mov     r10,BYTE [r9]
+.top:   mov     r10b,BYTE [r9]
         cmp     r10b,0
         je      .done
         cmp     r8b,r10b
@@ -100,8 +100,8 @@ _verify:; verify will compare bytes from offset up to MAX_READ against an array 
 
         ; local variables
         mov     QWORD [rbp-0x8],rdi
-        mov     WORD [rbp-0xa],rsi
-        mov     BYTE [rbp-0xb],rdx  ; options
+        mov     WORD [rbp-0xa],si
+        mov     WORD [rbp-0xc],dx   ; options
 
         ; flush r1
         bt      dx,1
@@ -110,17 +110,19 @@ _verify:; verify will compare bytes from offset up to MAX_READ against an array 
 
         ; body
 .dnf:   mov     cl,32
-.itop:  mov     sil,[rdi+dh]        ; offset buffer value
+        xchg    dl,dh
+        movzx   rdx,dl
+.itop:  mov     sil,[rdi+rdx]       ; offset buffer value
         mov     r8b,sil
-        call    r1
-        call    r2
-.ibot:  inc     dh
+        call    checkr1
+        call    checkr2
+.ibot:  inc     rdx
         dec     cl
         cmp     cl,0                ; MAX_READ reached?
         jne     .itop
 
         ; epilogue
-.done:  mov     rdx,BYTE [rbp-0xb]  ; options
+.done:  mov     dx,WORD [rbp-0xc]  ; options
         pop     rcx
         mov     rsp,rbp
         pop     rbp

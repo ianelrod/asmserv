@@ -31,7 +31,9 @@ _error:
 
         cmp     rax,0               ; if normal exit, skip message
         je      .end
-        lea     rsi,[section.rodata.start+(rax-1)*32]
+        dec     rax
+        lea     rdx,[ep1]
+        mov     rsi,[rdx+rax*8]
         call    length
         mov     rdi,1
         mov     rax,1
@@ -43,16 +45,22 @@ _error:
         pop     rbp
         ret
 
-section .rodata align=16
-error1: db      "Syntax: ./server [ip] [port]",0xa,0
-        times 32-$+error1 db 0
-error2: db      "Error: Invalid IP or port",0xa,0
-        times 32-$+error2 db 0
-error3: db      "Error: Socket error",0xa,0
-        times 32-$+error3 db 0
-error4: db      "Error: Bind error",0xa,0
-        times 32-$+error4 db 0
-error5: db      "Error: Listen error",0xa,0
-        times 32-$+error5 db 0
-error6: db      "Error: Invalid request method",0xa,0
-        times 32-$+error5 db 0
+section .data align=8               ; store error pointers
+ep1:    dq      es1
+ep2:    dq      es2
+ep3:    dq      es3
+ep4:    dq      es4
+ep5:    dq      es5
+ep6:    dq      es6
+ep7:    dq      es7
+ep8:    dq      es8
+
+section .rodata                     ; store error strings
+es1:    db      "Syntax: ./server [ip] [port]",0xa,0
+es2:    db      "Error: Invalid IP or port",0xa,0
+es3:    db      "Error: Socket error",0xa,0
+es4:    db      "Error: Bind error",0xa,0
+es5:    db      "Error: Listen error",0xa,0
+es6:    db      "Error: Invalid request method",0xa,0
+es7:    db      "Error: Invalid path",0xa,0
+es8:    db      "Error: File error",0xa,0

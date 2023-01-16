@@ -27,26 +27,28 @@ ae:     mov     rax,1
         syscall
         jmp     end
 
-align:  ; this subroutine brings all bytes from offset to null to front of buffer
+shift:  ; this subroutine brings all bytes from offset to null to front of buffer
 ; we are considering the potential that we read more into the buffer than it takes to find the delimiter (specified by the offset), so we save the extra content past offset for the next read
 ; r8:  offset pointer
 ; r9:  buf pointer
 ; r10: general register
         ; prologue
-        push    rax,rax
-        push    rdi,rdi
-        push    rcx,rcx
+        push    rax
+        push    rdi
+        push    rcx
         xor     r8,r8
         xor     r9,r9
         xor     r10,r10
 
         ; body
-        mov     r10b,dh
+        xchg    dl,dh
+        movzx   r10,dl
+        xchg    dh,dl
         lea     r9,[_buf]
-        cmp     r10b,0xff
+        cmp     r10,0xff
         je      .zero               ; if buffer is full, just zero it
-        lea     r8,[_buf+r10b]
-.top:   mov     r10b,[r8]
+        lea     r8,[_buf+r10]
+.top:   mov     r10b,BYTE [r8]
         jz      .zero
         mov     BYTE [r9],r10b      ; if byte is not null, bring it to front
         inc     r8
@@ -54,20 +56,22 @@ align:  ; this subroutine brings all bytes from offset to null to front of buffe
         jmp     .top
 .zero:  lea     r8,[_buf]
         sub     r9,r8
-        mov     dh,r9b              ; new offset
-        mov     r8b,254
-        sub     r8b,r9b
+        xchg    dl,dh
+        mov     dl,r9b              ; new offset
+        xchg    dh,dl
+        mov     r8,254
+        sub     r8,r9
 
         ; rep stosb stores rax in memory up to count rcx
         mov     cl,r8b              ; null count
         xor     rax,rax
-        lea     rdi,[_buf+r9b]
+        lea     rdi,[_buf+r9]
         rep stosb                   ; zero rest of buffer
 
         ; epilogue
-.dna:   pop     rcx,rcx
-        pop     rdi,rdi
-        pop     rax,rax
+.dna:   pop     rcx
+        pop     rdi
+        pop     rax
         ret
 
 check:  ; this subroutine checks conditions below for alignment
@@ -84,15 +88,17 @@ check:  ; this subroutine checks conditions below for alignment
         xor     rax,rax
 
         ; constants
-        mov     r9b,254
-        sub     r9b,32              ; BUF_SIZE - MAX_READ
+        mov     r9,254
+        sub     r9,32               ; BUF_SIZE - MAX_READ
 
         ; check for full buffer
-        mov     r8b,dh              ; offset
-        cmp     r8b,r9b
+        xchg    dl,dh
+        movzx   r8,dl               ; offset
+        xchg    dh,dl
+        cmp     r8,r9
         jge     .buf
 .next:  ; check for delimiter
-        mov     r8b,BYTE [_buf+r8b] ; offset buffer value
+        mov     r8b,BYTE [_buf+r8]  ; offset buffer value
         jnz     .del
 
         ; actions
@@ -120,9 +126,10 @@ take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
         
         ; read 32 bytes into buffer
         mov     rax,0
-        mov     rdi,WORD [rbp-0x2]
-        xor     r8,r8
-        mov     r8b,dh
+        movzx   rdi,WORD [rbp-0x2]
+        xchg    dl,dh
+        movzx   r8,dl
+        xchg    dh,dl
         lea     rsi,[_buf+r8]
         mov     rdx,32
         syscall
@@ -146,14 +153,16 @@ seek:   ; this subroutine reads from buffer from offset to delimiter or null
         xor     r9,r9
 
         ; delimiter comparison loop
-        mov     r8b,dh
-.top:   mov     r9b,[_buf+r8b]
+        xchg    dl,dh
+        movzx   r8,dl
+        xchg    dh,dl
+.top:   mov     r9b,BYTE [_buf+r8]
         jz      .done
         cmp     r9b,sil
         je      .done
         inc     r8b
         jmp     .top
-.done:  mov     [_buf-1],r8b        ; set offset
+.done:  mov     BYTE [_buf-1],r8b   ; set offset
 
         ; epilogue
         pop     r9
@@ -181,16 +190,16 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         push    r10
 
         ; local variables
-        mov     WORD [rbp-0x2],rdi  ; file descriptor
-        mov     BYTE [rbp-0x3],rsi  ; delimiter
-        mov     BYTE [rbp-0x4],rdx  ; options
+        mov     WORD [rbp-0x2],di   ; file descriptor
+        mov     BYTE [rbp-0x3],sil  ; delimiter
+        mov     BYTE [rbp-0x4],dl   ; options
         
         ; prepare function
-        mov     [_buf+255],0        ; zero null
+        mov     BYTE [_buf+255],0   ; zero null
         call    check               ; check alignment
         cmp     rax,0
         je      .top
-        call    align
+        call    shift
 
 ; the loop below reads from fd until security is triggered, buffer is full, or delimiter is found
 
@@ -202,10 +211,10 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 
         ; verify
         lea     rdi,[_buf]
-        mov     rsi,WORD [rbp-0x2]  ; delimiter
+        movzx   rsi,WORD [rbp-0x2]  ; delimiter
         call    _verify
         bts     dx,1                ; keep verify state
-        mov     BYTE [rbp-0x4],rdx
+        mov     BYTE [rbp-0x4],dl
 
 .dnv:   call    seek                ; find delimiter
         call    check               ; check buffer for delimiter or fullness

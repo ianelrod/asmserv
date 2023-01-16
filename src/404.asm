@@ -11,20 +11,16 @@ section .text
 
 _fof:   ; respond to socket with 404
 ; rdi: socket
-        push    rdi
-        mov     rax,0
         mov     rsi,0               ; dump socket
         mov     rdx,8
+.sys:   mov     rax,0               ; operator read
         syscall
-        pop     rdi
         cmp     rax,0
-        jge     _fof
-        push    rdi
+        jge     .sys                ; read from socket until error to clear buffer
         mov     rax,1
         mov     rsi,[fof_str]       ; send 404
         mov     rdx,24
         syscall
-        pop     rdi
         mov     rax,3
         syscall
         mov     rax,0

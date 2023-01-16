@@ -56,7 +56,7 @@ pt_atons:                           ; port ascii to network byte order
         jo      _end                ; if accumulator > 65535, error
         inc     rdi
         jmp     .top
-.done:  bswap   ax
+.done:  xchg    ah,al
         mov     WORD [rsi],ax       ; store accumulator
         ret
 
@@ -72,7 +72,7 @@ _conv:
         call    ip_aton
         mov     rdi,[rbp-0x10]      ; take pointer port str
         lea     rsi,[rbp-0x14]      ; make pointer port integer
-        call    pt_atoi
+        call    pt_atons
         mov     ax,2                ; AF_INET
         mov     WORD [rbp-0x12],ax
         mov     rax,QWORD [rbp-0x18]; pack sockaddr_in (add sin_zero later)

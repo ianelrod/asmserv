@@ -14,8 +14,8 @@ The program does not use:
 - IPv6
 
 Constraints:
-- Will GET/POST content up to 2GB
-- Handle file names up to 255B, linux max
+- Will GET/POST content up to 2GiB-1
+- Handle file names up to 255B, linux max-1
 - Will not parse url encoding
 
 Forbidden in paths:

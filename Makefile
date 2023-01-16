@@ -16,16 +16,16 @@ BINDIR  = bin
 
 SRCS    := $(wildcard $(SRCDIR)/*.asm)
 OBJS    := $(SRCS:$(SRCDIR)/%.asm=$(OBJDIR)/%.o)
-rm       = rm -f
+rm      = rm -f
 
 $(BINDIR)/$(TARGET): $(OBJS)
 	@mkdir -p $(@D)
 	@$(LD) -o $@ $(OBJS)
 
-$(OBJS): $(OBJDIR)/%.o : $(SRCDIR)/%.asm
+$(OBJS): $(OBJDIR)/%.o: $(SRCDIR)/%.asm
 	@mkdir -p $(@D)
-	@$(AS) $(ASFLAGS) -o $@
- 
+	@$(AS) $(ASFLAGS) -o $@ $<
+
 .PHONY: clean
 clean:
 	@$(rm) $(OBJS)
