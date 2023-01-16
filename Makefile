@@ -6,17 +6,17 @@
 # -----------------------------------------
 
 TARGET	= asmserv
-AS		= nasm
-ASFLAGS = -f elf64
-LD		= ld
+AS	= nasm
+ASFLAGS	= -f elf64
+LD	= ld
 
-SRCDIR  = src
-OBJDIR  = obj
-BINDIR  = bin
+SRCDIR	= src
+OBJDIR	= obj
+BINDIR	= bin
 
-SRCS    := $(wildcard $(SRCDIR)/*.asm)
-OBJS    := $(SRCS:$(SRCDIR)/%.asm=$(OBJDIR)/%.o)
-rm      = rm -f
+SRCS	:= $(wildcard $(SRCDIR)/*.asm)
+OBJS	:= $(SRCS:$(SRCDIR)/%.asm=$(OBJDIR)/%.o)
+rm	= rm -f
 
 $(BINDIR)/$(TARGET): $(OBJS)
 	@mkdir -p $(@D)
