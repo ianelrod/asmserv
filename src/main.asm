@@ -26,35 +26,35 @@ _start:
 main:
         push    rbp
         mov     rbp,rsp
-        sub     rsp,0x20
+        sub     rsp,0x4
         
-        mov     QWORD [rbp-0x8],rax ; unpack sockaddr_in to stack
-        xor     rax,rax
-        mov     QWORD [rbp-0x10],rax; sin_zero
+        int3
+        push    rax                 ; store sockaddr_in (mystruc) pointer
+        push    rax
 
         mov     rax,41              ; operator socket
         mov     rdi,2               ; AF_INET
         mov     rsi,1               ; SOCK_STREAM
         mov     rdx,0               ; 0
         syscall
-        cmp     rax,0               ; check for socket error
         inc     r12                 ; socket error: 3
+        cmp     rax,0               ; check for socket error
         jl      _end
-        mov     WORD [rbp-0x12],ax  ; sockfd to stack
+        mov     WORD [rbp-0x2],ax   ; sockfd to stack
         mov     rdi,rax
         mov     rax,49              ; operator bind
-        lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
+        pop     rsi                 ; sockaddr_in struct
         mov     rdx,16              ; sockaddr_in size
         syscall
-        cmp     rax,0               ; check for bind error
         inc     r12                 ; bind error: 4
+        cmp     rax,0               ; check for bind error
         jl      _end
         mov     rax,50              ; operator listen
-        movzx   rdi,WORD [rbp-0x12]  ; sockfd from stack
+        movzx   rdi,WORD [rbp-0x2]  ; sockfd from stack
         mov     rsi,5               ; backlog
         syscall
-        cmp     rax,0               ; check for listen error
         inc     r12                 ; listen error: 5
+        cmp     rax,0               ; check for listen error
         jl      _end
         mov     rax,1               ; operator write
         mov     rdi,1
@@ -64,14 +64,14 @@ main:
 
 listen: ; loop connections
         mov     rax,43              ; operator accept
-        movzx   rdi,WORD [rbp-0x12]  ; socket fd
-        lea     rsi,[rbp-0x10]      ; sockaddr_in from stack
+        movzx   rdi,WORD [rbp-0x2]  ; socket fd
+        pop     rsi                 ; sockaddr_in struct
         mov     rdx,16              ; sockaddr_in size
         syscall
-        mov     WORD [rbp-0x14],ax  ; connection fd
+        mov     WORD [rbp-0x4],ax   ; connection fd
         mov     rax,57              ; operator fork
         syscall
-        movzx   rdi,WORD [rbp-0x14]  ; connection fd
+        movzx   rdi,WORD [rbp-0x4]  ; connection fd
         cmp     rax,0
         jg      .next
 .handle:call    _handle

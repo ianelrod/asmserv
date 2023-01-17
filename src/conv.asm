@@ -5,11 +5,18 @@
 ; Convert IP and port string to binary
 ; -----------------------------------------
 
+struc sockaddr_in                   ; preprocessor macro
+    .sin_family:    resw    1
+    .sin_port:      resw    1
+    .sin_addr:      resb    4
+    .sin_zero:      resb    8
+endstruc
+
 section .text
         global  _conv
         extern  _end
 
-ip_aton:                            ; ip ascii to network byte order
+ip_aton:                            ; ip ascii to network order (big-endian)
 ; rax: accumulator
 ; rdi: ascii pointer
 ; rsi: network byte order pointer
@@ -17,7 +24,6 @@ ip_aton:                            ; ip ascii to network byte order
 ; rdx: general purpose
         xor     rax,rax
         xor     rcx,rcx
-        mov     DWORD [rsi],eax     ; init with 0s
         mov     cl,4                ; set loop counter
 .top:   xor     rdx,rdx
         mov     dl,BYTE [rdi]       ; load char
@@ -37,7 +43,7 @@ ip_aton:                            ; ip ascii to network byte order
         jnz     .top
         ret
 
-pt_atons:                           ; port ascii to network byte order
+pt_atons:                           ; port ascii to network short (big-endian)
 ; rax: accumulator
 ; rdi: ascii pointer
 ; rsi: integer pointer
@@ -56,7 +62,7 @@ pt_atons:                           ; port ascii to network byte order
         jo      _end                ; if accumulator > 65535, error
         inc     rdi
         jmp     .top
-.done:  xchg    ah,al
+.done:  xchg    ah,al               ; convert to big-endian
         mov     WORD [rsi],ax       ; store accumulator
         ret
 
@@ -65,18 +71,22 @@ _conv:
         mov     rbp,rsp
         sub     rsp,0x18
 
-        inc     r12                 ; conversion error: 2        
+        inc     r12                 ; conversion error: 2
         mov     [rbp-0x8],rdi       ; store pointer ip str
         mov     [rbp-0x10],rsi      ; store pointer port str
-        lea     rsi,[rbp-0x18]      ; make pointer ip network byte order
+        lea     rsi,[mystruc+sockaddr_in.sin_addr] ; make pointer ip network byte order
         call    ip_aton
         mov     rdi,[rbp-0x10]      ; take pointer port str
-        lea     rsi,[rbp-0x14]      ; make pointer port integer
+        lea     rsi,[mystruc+sockaddr_in.sin_port] ; make pointer port integer
         call    pt_atons
         mov     ax,2                ; AF_INET
-        mov     WORD [rbp-0x12],ax
-        mov     rax,QWORD [rbp-0x18]; pack sockaddr_in (add sin_zero later)
+        ;xchg    ah,al
+        mov     WORD [mystruc+sockaddr_in.sin_family],ax
+        lea     rax,[mystruc]       ; return pointer to mystruc
 
         mov     rsp,rbp
         pop     rbp
         ret
+
+section .bss
+mystruc:resb    sockaddr_in_size    ; nasm defines sockaddr_in_size for us
