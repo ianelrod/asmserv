@@ -13,18 +13,13 @@ section .text
         extern  _post
         extern  _end
 
-open:   ; this subroutine attempts to open a file fd
-; r8:  path string pointer
-; r9:  file fd
-; r10: general register
-
 _handle:; this function receives a child forked from main and performs all steps necessary to handle a connection
 ; It closely interoperates with read.asm to parse data
 ; rax: result handler
 ; rdi: connection fd / general register
 ; rsi: general register
 ; dh:  offset
-; dl:  handle + read state
+; dl:  handle + read i/o control
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
@@ -32,14 +27,13 @@ _handle:; this function receives a child forked from main and performs all steps
 ; rcx: counter
         ; prologue
         push    rdi                 ; put connection fd
-        xor     dx,dx               ; clear options for new child
 
         ; get HTTP request method
         xor     rax,rax
+        xor     dx,dx               ; clear options for new child
         mov     rsi," "             ; delimit strings by space
         btr     dx,0                ; no security
         call    _read
-        push    rax                 ; put buffer pointer
 
         ; interpret HTTP request method
         ; 1. check read result
@@ -59,17 +53,17 @@ _handle:; this function receives a child forked from main and performs all steps
         xor     rcx,rcx
         xor     rsi,rsi
         mov     cl,dh
-.top:   mov     dil,BYTE [rax]      ; take byte
-        mov     sil,dil             ; put byte
-        shl     rsi,8
-        inc     rax
         dec     cl
+.top:   mov     dil,BYTE [rax+rcx]  ; take byte
+        mov     sil,dil             ; put byte
+        test    cl,cl
         jz      .done
+        dec     cl
+        shl     rsi,8
         jmp     .top
 
         ; 3. compare request method to "GET" or "POST"
-.done:  pop     rax                 ; get buffer pointer
-        pop     rdi                 ; get connection fd
+.done:  pop     rdi                 ; get connection fd
         cmp     rsi,"GET"
         jne     .i
         call    _get

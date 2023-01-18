@@ -10,7 +10,8 @@ section .text
         extern  _end
 
 _fof:   ; respond to socket with 404
-; rdi: socket
+; rdi: socket fd
+        push    rdi
         mov     rsi,0               ; dump socket
         mov     rdx,8
 .sys:   mov     rax,0               ; operator read
@@ -18,6 +19,7 @@ _fof:   ; respond to socket with 404
         cmp     rax,0
         jge     .sys                ; read from socket until error to clear buffer
         mov     rax,1
+        pop     rdi
         mov     rsi,[fof_str]       ; send 404
         mov     rdx,24
         syscall

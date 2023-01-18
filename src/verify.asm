@@ -79,14 +79,12 @@ checkr2:; check byte against rule 2
         ; epilogue
 .done:  ret
 
-_verify:; verify will compare bytes from offset up to MAX_READ against an array of bad bytes. It will respond 404 if a match is found.
-; rax: r1 state
-; 0000 keep
-; 0001 flush
-; rdi: buffer pointer
-; rsi: socket fd
+_verify:; verify will compare bytes from offset up to delimiter against an array of bad bytes. It will respond 404 if a match is found.
+; rax: buffer pointer
+; rdi: connection fd
+; rsi: delimiter
 ; dh:  offset
-; dl:  handle + read state
+; dl:  handle + read i/o control
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
@@ -95,34 +93,36 @@ _verify:; verify will compare bytes from offset up to MAX_READ against an array 
         ; prologue
         push    rbp
         mov     rbp,rsp
-        sub     rsp,0xb
+        sub     rsp,0xd
         push    rcx
 
         ; local variables
-        mov     QWORD [rbp-0x8],rdi
-        mov     WORD [rbp-0xa],si
-        mov     WORD [rbp-0xc],dx   ; options
+        mov     QWORD [rbp-0x8],rax ; buffer
+        mov     WORD [rbp-0xa],di   ; connection fd
+        mov     BYTE [rbp-0xb],sil  ; delimiter
+        mov     WORD [rbp-0xd],dx   ; options
 
         ; flush r1
         bt      dx,1
-        jnc     .dnf
+        jc      .dnf
         call    flush
 
         ; body
-.dnf:   mov     cl,32
+.dnf:   mov     cl,BYTE [rbp-0xb]   ; delimiter
         xchg    dl,dh
         movzx   rdx,dl
-.itop:  mov     sil,[rdi+rdx]       ; offset buffer value
-        mov     r8b,sil
+.itop:  movzx   r8,BYTE [rax+rdx]   ; offset buffer value
+        cmp     r8b,sil
+        je      .done               ; if delimiter, done
+        test    r8b,r8b
+        jz      .done               ; if end of buffer content, done
         call    checkr1
         call    checkr2
 .ibot:  inc     rdx
-        dec     cl
-        cmp     cl,0                ; MAX_READ reached?
-        jne     .itop
+        jmp     .itop
 
         ; epilogue
-.done:  mov     dx,WORD [rbp-0xc]  ; options
+.done:  mov     dx,WORD [rbp-0xd]  ; options
         pop     rcx
         mov     rsp,rbp
         pop     rbp

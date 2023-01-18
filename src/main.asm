@@ -26,11 +26,9 @@ _start:
 main:
         push    rbp
         mov     rbp,rsp
-        sub     rsp,0x4
+        sub     rsp,0x2
         
-        int3
         push    rax                 ; store sockaddr_in (mystruc) pointer
-        push    rax
 
         mov     rax,41              ; operator socket
         mov     rdi,2               ; AF_INET
@@ -40,7 +38,7 @@ main:
         inc     r12                 ; socket error: 3
         cmp     rax,0               ; check for socket error
         jl      _end
-        mov     WORD [rbp-0x2],ax   ; sockfd to stack
+        mov     BYTE [rbp-0x1],al   ; sockfd to stack
         mov     rdi,rax
         mov     rax,49              ; operator bind
         pop     rsi                 ; sockaddr_in struct
@@ -50,7 +48,7 @@ main:
         cmp     rax,0               ; check for bind error
         jl      _end
         mov     rax,50              ; operator listen
-        movzx   rdi,WORD [rbp-0x2]  ; sockfd from stack
+        movzx   rdi,BYTE [rbp-0x1]  ; sockfd from stack
         mov     rsi,5               ; backlog
         syscall
         inc     r12                 ; listen error: 5
@@ -63,15 +61,16 @@ main:
         syscall
 
 listen: ; loop connections
-        mov     rax,43              ; operator accept
-        movzx   rdi,WORD [rbp-0x2]  ; socket fd
-        pop     rsi                 ; sockaddr_in struct
-        mov     rdx,16              ; sockaddr_in size
+        mov     rax,288             ; operator accept4 (for nonblocking). Only failure case I can think of is a situation where the connection isn't closed by the client immediately. Or, if the client induces a server segfault by causing a blocking write. After the initial request, our program responds and closes the connection. I'll worry about that after my initial implementation.
+        movzx   rdi,BYTE [rbp-0x1]  ; socket fd
+        xor     rsi,rsi             ; any addr
+        xor     rdx,rdx             ; null addrlen
+        mov     r10,0o4000           ; SOCK_NONBLOCK
         syscall
-        mov     WORD [rbp-0x4],ax   ; connection fd
+        mov     BYTE [rbp-0x2],al   ; connection fd
         mov     rax,57              ; operator fork
         syscall
-        movzx   rdi,WORD [rbp-0x4]  ; connection fd
+        movzx   rdi,BYTE [rbp-0x2]  ; connection fd
         cmp     rax,0
         jg      .next
 .handle:call    _handle

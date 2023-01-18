@@ -18,7 +18,7 @@ _get:   ; this function is called from handle.asm to perform actions related to 
 ; rcx: counter
 ; OPTIONS
 ; dh:  offset
-; dl:  handle + read state
+; dl:  handle + read i/o control
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
@@ -31,19 +31,18 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         ; prologue
         push    rbp
         mov     rbp,rsp
-        sub     rsp,258
+        sub     rsp,259
 
         ; get HTTP request path
         xor     rax,rax
-        mov     BYTE [rbp-257],al   ; zero local path offset
         mov     rsi," "             ; delimit strings by space
         bts     dx,0                ; security
-.top1:  btr     dx,2
+.top1:  btr     dx,2        
         call    _read
 
         ; interpret HTTP request path
         ; 1. check read result
-        mov     BYTE [rbp-260],dil  ; put connection fd
+        mov     BYTE [rbp-259],dil  ; put connection fd
         xor     rdi,rdi
         xor     rsi,rsi
         xchg    dl,dh               ; buffer offset from dh to sil
@@ -60,14 +59,14 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         jmp     .top1
 
         ; 2. store request path in local variable
-.i:     btc     dx,2                ; delimiter found, done reading request path
+.i:     btr     dx,2                ; delimiter found, done reading request path
         jmp     .l
 .j:     bt      dx,2                ; is this not our first read?
         jnc     .k
         add     BYTE [rbp-257],dh   ; add offset to local path offset
 .k:     bts     dx,2                ; offset > BUF_SIZE - MAX_READ
 .l:     xor     rcx,rcx
-        mov     cl,BYTE [rbp-257]   ; local path offset set to 0 in the beginning, optionally picking up where we left off in subsequent loops
+        movzx   rcx,BYTE [rbp-257]  ; local path offset set to 0 in the beginning, optionally picking up where we left off in subsequent loops
         inc     r12                 ; path error: 7
         cmp     rcx,255             ; if our path is longer than 255 bytes, something has gone seriously wrong
         jge     .end
@@ -84,12 +83,12 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         jmp     .top2
 .done:  pop     rax
         bt      dx,2
-        jc      .top1
+        jc      .top1               ; full path not gotten yet, so read again
 
         ; interpret file path
         push    rdx                 ; retain options
         mov     rax,2               ; operator open
-        mov     rdi,[rbp-255]       ; ignore beginning forward slash
+        lea     rdi,[rbp-255]       ; ignore beginning forward slash
         xor     rsi,rsi
         xor     rdx,rdx
         syscall
@@ -98,8 +97,8 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         jl      .end
         mov     BYTE [rbp-258],al   ; put file descriptor
 
-        ; flush socket
-        mov     dil,BYTE [rbp-259]  ; take connection fd
+        ; flush socket using read
+        movzx   rdi,BYTE [rbp-259]  ; take connection fd
         mov     rsi,0
         mov     rdx,8
 .sys:   mov     rax,0               ; operator read
@@ -110,12 +109,13 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         ; send contents of file back to client, we can use sendfile for this
         ; 1. get file size using lseek
         mov     rax,8               ; operator lseek
-        mov     dil,BYTE [rbp-258]  ; in fd (file)
+        movzx   rdi,BYTE [rbp-258]  ; in fd (file)
         mov     rsi,0               ; offset
         mov     rdx,2               ; SEEK_END
         syscall
         cmp     rax,2147483647      ; file over 2GiB-1 limit?
         jo      .end                ; file error: 8
+        inc     rax
         push    rax
 
         ; 2. reset file offset using lseek
@@ -133,6 +133,7 @@ _get:   ; this function is called from handle.asm to perform actions related to 
 
         ; epilogue
         pop     rdx                 ; empty stack
+        mov     r12,0               ; normal exit
 .end:   mov     rsp,rbp
         pop     rbp
         ret

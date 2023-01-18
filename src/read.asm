@@ -45,10 +45,15 @@ shift:  ; this subroutine brings all bytes from offset to null to front of buffe
         movzx   r10,dl
         xchg    dh,dl
         lea     r9,[_buf]
-        cmp     r10,0xff
-        je      .zero               ; if buffer is full, just zero it
-        lea     r8,[_buf+r10]
+        cmp     r10,223
+        jge     .zero               ; if buffer > BUF_SIZE - MAX_READ, just zero it
+        mov     r8b,BYTE [_buf+r10]
+        test    r8b,r8b             ; if buffer offset value is not zero, we need to add one (presuming here the value is the delimiter) to start properly at next section
+        jz      .i
+        inc     r10
+.i:     lea     r8,[_buf+r10]
 .top:   mov     r10b,BYTE [r8]
+        test    r10b,r10b
         jz      .zero
         mov     BYTE [r9],r10b      ; if byte is not null, bring it to front
         inc     r8
@@ -57,9 +62,9 @@ shift:  ; this subroutine brings all bytes from offset to null to front of buffe
 .zero:  lea     r8,[_buf]
         sub     r9,r8
         xchg    dl,dh
-        mov     dl,r9b              ; new offset
+        mov     dl,0                ; new offset
         xchg    dh,dl
-        mov     r8,254
+        mov     r8,0xff
         sub     r8,r9
 
         ; rep stosb stores rax in memory up to count rcx
@@ -99,15 +104,16 @@ check:  ; this subroutine checks conditions below for alignment
         jge     .buf
 .next:  ; check for delimiter
         mov     r8b,BYTE [_buf+r8]  ; offset buffer value
+        test    r8b,r8b
         jnz     .del
+        jmp     .done
 
         ; actions
 .buf:   inc     rax
         jmp     .next
-.del:   inc     rax
-        cmp     rax,2
-        jl      .done
-        inc     rax
+.del:   cmp     rax,1
+        je      .done
+        add     rax,2
 
         ; epilogue
 .done:  pop     r9
@@ -126,16 +132,19 @@ take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
         
         ; read 32 bytes into buffer
         mov     rax,0
-        movzx   rdi,WORD [rbp-0x2]
+        movzx   rdi,BYTE [rbp-0x1]
         xchg    dl,dh
         movzx   r8,dl
         xchg    dh,dl
         lea     rsi,[_buf+r8]
+        mov     r8b,BYTE [rsi]
+        test    r8,r8
+        jnz     .dnt                    ; We want to preserve content that hasn't been read yet. This case happens if shift is called due to a found delimiter, and not a full buffer.
         mov     rdx,32
         syscall
         
         ; epilogue
-        pop     rdx
+.dnt:   pop     rdx
         pop     rsi
         pop     rdi
         pop     r9
@@ -157,12 +166,15 @@ seek:   ; this subroutine reads from buffer from offset to delimiter or null
         movzx   r8,dl
         xchg    dh,dl
 .top:   mov     r9b,BYTE [_buf+r8]
+        test    r9b,r9b
         jz      .done
         cmp     r9b,sil
         je      .done
         inc     r8b
         jmp     .top
-.done:  mov     BYTE [_buf-1],r8b   ; set offset
+.done:  xchg    dl,dh
+        mov     dl,r8b
+        xchg    dh,dl               ; set offset
 
         ; epilogue
         pop     r9
@@ -174,7 +186,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 ; rdi:  file descriptor
 ; rsi:  delimiter
 ; dh:  offset
-; dl:  handle + read state
+; dl:  handle + read i/o control
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
@@ -186,13 +198,13 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         ; prologue
         push    rbp
         mov     rbp,rsp
-        sub     rsp,0x4
+        sub     rsp,0x5
         push    r10
 
         ; local variables
-        mov     WORD [rbp-0x2],di   ; file descriptor
-        mov     BYTE [rbp-0x3],sil  ; delimiter
-        mov     BYTE [rbp-0x4],dl   ; options
+        mov     BYTE [rbp-0x1],dil  ; file descriptor
+        mov     BYTE [rbp-0x2],sil  ; delimiter
+        mov     WORD [rbp-0x4],dx   ; options
         
         ; prepare function
         mov     BYTE [_buf+255],0   ; zero null
@@ -205,16 +217,17 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 
 .top:   call    take                ; read from fd
         cmp     rax,0
-        jle     rw                  ; if read error, warn
+        jl      rw                  ; if read error, warn
         bt      dx,0
         jnc     .dnv                ; do not verify
 
         ; verify
-        lea     rdi,[_buf]
-        movzx   rsi,WORD [rbp-0x2]  ; delimiter
+        lea     rax,[_buf]
+        movzx   rdi,BYTE [rbp-0x1]  ; connection fd
+        movzx   rsi,BYTE [rbp-0x2]  ; delimiter
         call    _verify
         bts     dx,1                ; keep verify state
-        mov     BYTE [rbp-0x4],dl
+        mov     WORD [rbp-0x4],dx
 
 .dnv:   call    seek                ; find delimiter
         call    check               ; check buffer for delimiter or fullness
@@ -223,6 +236,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 
         ; epilogue
 end:    lea     rax,[_buf]
+        movzx   rdi,BYTE [rbp-0x1]  ; connection fd
         pop     r10
         mov     rsp,rbp
         pop     rbp
