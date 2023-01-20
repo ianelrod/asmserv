@@ -120,7 +120,7 @@ check:  ; this subroutine checks conditions below for alignment
         pop     r8
         ret
 
-take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
+take:   ; this subroutine reads from fd into buffer from offset up to MAX_READ
         ; prologue
         push    r8
         push    r9
@@ -131,7 +131,7 @@ take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
         xor     r9,r9
         
         ; read 32 bytes into buffer
-        mov     rax,0
+        mov     rax,0                   ; operator read
         movzx   rdi,BYTE [rbp-0x1]
         xchg    dl,dh
         movzx   r8,dl
@@ -142,9 +142,12 @@ take:   ; this subroutine reads from fd into buffer from offset to MAX_READ
         jnz     .dnt                    ; We want to preserve content that hasn't been read yet. This case happens if shift is called due to a found delimiter, and not a full buffer.
         mov     rdx,32
         syscall
+        jmp     .done
+
+.dnt:   mov     rax,0                   ; delimiter found, no read error
         
         ; epilogue
-.dnt:   pop     rdx
+.done:  pop     rdx
         pop     rsi
         pop     rdi
         pop     r9
