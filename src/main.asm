@@ -65,7 +65,7 @@ listen: ; loop connections
         movzx   rdi,BYTE [rbp-0x1]  ; socket fd
         xor     rsi,rsi             ; any addr
         xor     rdx,rdx             ; null addrlen
-        mov     r10,0o4000           ; SOCK_NONBLOCK
+        mov     r10,0o4000          ; SOCK_NONBLOCK
         syscall
         mov     BYTE [rbp-0x2],al   ; connection fd
         mov     rax,57              ; operator fork

@@ -10,8 +10,7 @@ section .text
         extern  _read
         extern  _error
         extern  _get
-        extern  _post
-        extern  _end
+;        extern  _post
 
 _handle:; this function receives a child forked from main and performs all steps necessary to handle a connection
 ; It closely interoperates with read.asm to parse data
@@ -23,14 +22,30 @@ _handle:; this function receives a child forked from main and performs all steps
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
-; 0000 1000 none          (8)
+; 0000 1000 verify fail   (8)
 ; rcx: counter
         ; prologue
         push    rdi                 ; put connection fd
 
+        ; set socket option SO_LINGER
+        mov     r8,8                ; struct length 8 bytes
+        ; struct linger {
+        ;     int l_onoff;    /* linger active */
+        ;     int l_linger;   /* how many seconds to linger for */
+        ; };
+        mov     rax,0x100000001     ; SO_LINGER struct
+        push    rax
+        lea     r10,[rsp]           ; set boolean to true
+        mov     rdx,13              ; SO_LINGER (wait around until all data is sent for 200 ms even after calling exit())
+        mov     rsi,1               ; SOL_SOCKET (edit socket api layer)
+        xor     rax,rax
+        mov     rax,54              ; operator setsockopt
+        syscall
+        pop     rax
+
         ; get HTTP request method
         xor     rax,rax
-        xor     dx,dx               ; clear options for new child
+        xor     rdx,rdx             ; clear options for new child
         mov     rsi," "             ; delimit strings by space
         btr     dx,0                ; no security
         call    _read
@@ -40,14 +55,14 @@ _handle:; this function receives a child forked from main and performs all steps
         xor     rdi,rdi
         inc     r12                 ; method error: 6
         cmp     dh,8                ; verify length
-        jg      end
+        jg      .end
         push    dx                  ; next 5 lines devoted to coping with using dh
         xchg    dl,dh
         movzx   rdx,dl
         mov     dil,BYTE [rax+rdx]
         pop     dx
         cmp     dil," "             ; verify delimiter
-        jne     end
+        jne     .end
 
         ; 2. store request method in local variable
         xor     rcx,rcx
@@ -67,10 +82,10 @@ _handle:; this function receives a child forked from main and performs all steps
         cmp     rsi,"GET"
         jne     .i
         call    _get
-        jmp     end
+        jmp     .end
 .i:     cmp     rsi,"POST"
-        jne     end
-        call    _post
+        jne     .end
+;        call    _post
 
         ; epilogue
-end:    ret
+.end:    ret

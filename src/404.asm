@@ -7,26 +7,39 @@
 
 section .text
         global  _fof
-        extern  _end
 
 _fof:   ; respond to socket with 404
 ; rdi: socket fd
+        ; prologue
+        xor     rax,rax
+        push    rdx
         push    rdi
-        mov     rsi,0               ; dump socket
-        mov     rdx,8
-.sys:   mov     rax,0               ; operator read
+        push    rax
+
+.clr:   mov     QWORD [rsp],0
+        lea     rdx,[rsp]
+        mov     rsi,0x541B
+        mov     rax,16              ; operator ioctl
         syscall
+        mov     rax,QWORD [rsp]
         cmp     rax,0
-        jge     .sys                ; read from socket until error to clear buffer
-        mov     rax,1
-        pop     rdi
-        mov     rsi,[fof_str]       ; send 404
+        jle     .done
+        mov     rdx,8
+        lea     rsi,[rsp]
+        mov     rax,0               ; operator read
+        syscall
+        jmp     .clr                ; read from socket until error to clear buffer
+
+.done:  pop     rax
+        mov     rax,1               ; operator write
+        pop     rdi                 ; connection fd
+        lea     rsi,[fof_str]       ; send 404
         mov     rdx,24
         syscall
-        mov     rax,3
-        syscall
-        mov     rax,0
-        jmp     _end
+
+        mov     r12,0               ; normal exit
+        pop     rdx
+        ret
 
 section .rodata
 fof_str:db      "HTTP/1.1 404 Not Found",0xa,0

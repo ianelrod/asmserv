@@ -10,6 +10,46 @@ section .text
         extern  _read
         extern  _end
 
+chkrd:  ; this subroutine checks the TCP unread buffer and returns count
+; rax: ioctl operator / result
+; rdi: connection fd
+; rsi: TIOCINQ (data in receive queue not read and not ack'd)
+; rdx: data count
+        mov     QWORD [rbp-267],0           ; clear previous result
+        lea     rdx,[rbp-267]
+        mov     rsi,0x541B
+        movzx   rdi,BYTE [rbp-259]
+        mov     rax,16
+        syscall
+        mov     rax,QWORD [rbp-267]
+        ret
+
+; chksd: ; this subroutine checks the TCP unsent buffer and returns count
+; ; rax: ioctl operator / result
+; ; rdi: connection fd
+; ; rsi: TIOCOUTQ (data in send queue not sent and not ack'd)
+; ; rdx: data count
+;         mov     QWORD [rbp-267],0          ; clear previous result
+;         lea     rdx,[rbp-267]
+;         mov     rsi,0x5411
+;         movzx   rdi,BYTE [rbp-259]
+;         mov     rax,16
+;         syscall
+;         mov     rax,QWORD [rbp-267]
+;         ret
+
+flush: ; this subroutine reads from the socket to /dev/null
+; rax: read operator / result
+; rdi: connection fd
+; rsi: /dev/null
+; rdx: read count
+        mov     rdx,8
+        lea     rsi,[rbp-267]
+        movzx   rdi,BYTE [rbp-259]
+        mov     rax,0
+        syscall
+        ret
+
 _get:   ; this function is called from handle.asm to perform actions related to GET requests
 ; REGISTERS
 ; rax: result handler
@@ -22,16 +62,17 @@ _get:   ; this function is called from handle.asm to perform actions related to 
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
-; 0000 1000 none          (8)
+; 0000 1000 verify fail   (8)
 ; STACK
 ; rbp-256:  local path buffer
 ; rbp-257:  local path offset
 ; rbp-258:  file fd
 ; rbp-259:  connection fd
+; rbp-267:  unsent/unread data
         ; prologue
         push    rbp
         mov     rbp,rsp
-        sub     rsp,259
+        sub     rsp,267
 
         ; get HTTP request path
         xor     rax,rax
@@ -39,6 +80,10 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         bts     dx,0                ; security
 .top1:  btr     dx,2        
         call    _read
+
+        ; security check (verify failed?)
+        bt      dx,3
+        jc      .end
 
         ; interpret HTTP request path
         ; 1. check read result
@@ -79,9 +124,9 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         inc     rax
         inc     rsi
         dec     cl
-        jz      .done
+        jz      .done1
         jmp     .top2
-.done:  pop     rax
+.done1: pop     rax
         bt      dx,2
         jc      .top1               ; full path not gotten yet, so read again
 
@@ -98,17 +143,15 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         mov     BYTE [rbp-258],al   ; put file descriptor
 
         ; flush socket using read
-        movzx   rdi,BYTE [rbp-259]  ; take connection fd
-        mov     rsi,0
-        mov     rdx,8
-.sys:   mov     rax,0               ; operator read
-        syscall
+.clr:   call    chkrd
         cmp     rax,0
-        jge     .sys                ; read from socket until error to clear buffer
+        jle     .done2
+        call    flush
+        jmp     .clr
 
         ; send contents of file back to client, we can use sendfile for this
         ; 1. get file size using lseek
-        mov     rax,8               ; operator lseek
+.done2: mov     rax,8               ; operator lseek
         movzx   rdi,BYTE [rbp-258]  ; in fd (file)
         mov     rsi,0               ; offset
         mov     rdx,2               ; SEEK_END
@@ -125,11 +168,27 @@ _get:   ; this function is called from handle.asm to perform actions related to 
 
         ; 3. transfer file using sendfile
         mov     rax,40              ; operator sendfile
-        mov     dil,BYTE [rbp-259]  ; out fd (connection)
-        mov     sil,BYTE [rbp-258]  ; in fd (file)
+        movzx   rdi,BYTE [rbp-259]  ; out fd (connection)
+        movzx   rsi,BYTE [rbp-258]  ; in fd (file)
         mov     rdx,0               ; offset 0
         pop     r10                 ; file size, also count to send
         syscall
+
+        ; 4. wait until all data is sent before closing
+        ; this is necessary because our socket is nonblocking. We could and likely would close the connection before all data is sent.
+; .sit:   mov     rax,16              ; operator ioctl
+;         movzx   rdi,BYTE [rbp-259]
+;         mov     rsi,0x5411          ; TIOCOUTQ (data in send queue not sent and not ack'd)
+;         lea     rdx,[rbp-267]
+;         syscall
+;         mov     rdx,QWORD [rbp-267] ; unsigned int
+;         cmp     rdx,0
+;         jg      .sit
+
+        ; close connection
+        ; mov     rax,3               ; operator close
+        ; movzx   rdi,BYTE [rbp-259]
+        ; syscall
 
         ; epilogue
         pop     rdx                 ; empty stack

@@ -190,7 +190,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
-; 0000 1000 none          (8)
+; 0000 1000 verify fail   (8)
 ; Security is only necessary if reading from a socket, not a file.
 ; In this case, we can trust that the fd is a socket fd
 ; r8:   general register
@@ -226,6 +226,8 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         movzx   rdi,BYTE [rbp-0x1]  ; connection fd
         movzx   rsi,BYTE [rbp-0x2]  ; delimiter
         call    _verify
+        bt      dx,3                ; verify failure
+        jc      end
         bts     dx,1                ; keep verify state
         mov     WORD [rbp-0x4],dx
 

@@ -44,16 +44,19 @@ checkr1:; check byte against rule 1
         cmp     r10b,0
         je      .done
         cmp     r8b,r10b
-        je      .error
+        je      .fail
 .next:  add     r9,2
         jmp     .top
 
-.error: mov     r10b,BYTE [r9+1]
-        cmp     r10b,0
-        jne     _fof
+.fail:  mov     r10b,BYTE [r9+1]
+        test    r10b,r10b
+        jnz     .fof
         inc     r10b
         mov     BYTE [r9+1],r10b
         jmp     .next
+
+.fof:   call    _fof
+        bts     dx,3
 
         ; epilogue
 .done:  ret
@@ -72,9 +75,12 @@ checkr2:; check byte against rule 2
         cmp     r10b,0
         je      .done
         cmp     r8b,r10b
-        je      _fof
+        je      .fail
 .next:  inc     r9
         jmp     .top
+
+.fail:  call    _fof
+        bts     dx,3
 
         ; epilogue
 .done:  ret
@@ -88,7 +94,7 @@ _verify:; verify will compare bytes from offset up to delimiter against an array
 ; 0000 0001 read security (1)
 ; 0000 0010 keep verify   (2)
 ; 0000 0100 read not done (4)
-; 0000 1000 none          (8)
+; 0000 1000 verify fail   (8)
 ; rcx: loop counter
         ; prologue
         push    rbp
@@ -111,15 +117,24 @@ _verify:; verify will compare bytes from offset up to delimiter against an array
 .dnf:   mov     cl,BYTE [rbp-0xb]   ; delimiter
         xchg    dl,dh
         movzx   rdx,dl
-.itop:  movzx   r8,BYTE [rax+rdx]   ; offset buffer value
+.top:   movzx   r8,BYTE [rax+rdx]   ; offset buffer value
         cmp     r8b,sil
         je      .done               ; if delimiter, done
         test    r8b,r8b
         jz      .done               ; if end of buffer content, done
+        push    rdx
+        xor     rdx,rdx
         call    checkr1
+        bt      dx,3
+        jc      .fail
         call    checkr2
-.ibot:  inc     rdx
-        jmp     .itop
+        bt      dx,3
+        jc      .fail
+        pop     rdx
+        inc     rdx
+        jmp     .top
+
+.fail:  mov     WORD [rbp-0xd],dx
 
         ; epilogue
 .done:  mov     dx,WORD [rbp-0xd]  ; options
