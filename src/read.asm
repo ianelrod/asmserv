@@ -109,11 +109,12 @@ check:  ; this subroutine checks conditions below for alignment
         jmp     .done
 
         ; actions
-.buf:   inc     rax
+.buf:   bts     rax,0
         jmp     .next
-.del:   cmp     rax,1
-        je      .done
-        add     rax,2
+.del:   bts     rax,1
+        bt      rax,0
+        jc      .done
+        jmp     .next
 
         ; epilogue
 .done:  pop     r9
@@ -214,10 +215,10 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         call    check               ; check alignment
         cmp     rax,0
         je      .top
-        call    shift
 
 ; the loop below reads from fd until security is triggered, buffer is full, or delimiter is found
 
+.shift: call    shift               ; align buffer, label not used yet
 .top:   call    take                ; read from fd
         cmp     rax,0
         jl      rw                  ; if read error, warn
@@ -236,7 +237,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
 
 .dnv:   call    seek                ; find delimiter
         call    check               ; check buffer for delimiter or fullness
-        and     rax,3
+        test    rax,rax             ; check return values 1,2,3 not differentiated yet
         jz      .top
 
         ; epilogue

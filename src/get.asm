@@ -78,7 +78,7 @@ _get:   ; this function is called from handle.asm to perform actions related to 
         xor     rax,rax
         mov     rsi," "             ; delimit strings by space
         bts     dx,0                ; security
-.top1:  btr     dx,2        
+.top1:  btr     dx,2
         call    _read
 
         ; security check (verify failed?)
