@@ -208,7 +208,7 @@ _read:  ; this function reads from a fd and optionally sanitizes, up to 254 byte
         mov     BYTE [rbp-0x1],dil  ; file descriptor
         mov     BYTE [rbp-0x2],sil  ; delimiter
         mov     WORD [rbp-0x4],dx   ; options
-        
+
         ; prepare function
         mov     BYTE [_buf+255],0   ; zero null
         call    check               ; check alignment

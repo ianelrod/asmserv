@@ -18,8 +18,8 @@ _start:
         mov     r12,1               ; arguments error: 1
         jne     _end
 
-        mov     rdi,[rsp+0x10]      ; take pointer ip str
-        mov     rsi,[rsp+0x18]      ; take pointer port str
+        mov     rdi,QWORD [rsp+0x10]; take pointer ip str
+        mov     rsi,QWORD [rsp+0x18]; take pointer port str
         call    _conv               ; convert args to sockaddr_in struct
         add     rsp,0x18            ; clear shell args
 
@@ -61,7 +61,7 @@ main:
         syscall
 
 listen: ; loop connections
-        mov     rax,288             ; operator accept4 (for nonblocking). Only failure case I can think of is a situation where the connection isn't closed by the client immediately. Or, if the client induces a server segfault by causing a blocking write. After the initial request, our program responds and closes the connection. I'll worry about that after my initial implementation.
+        mov     rax,288             ; operator accept4 (for nonblocking capabilities). Only failure case I can think of is a situation where the connection isn't closed by the client immediately. Or, if the client induces a server segfault by causing a blocking write. After the initial request, our program responds and closes the connection. I'll worry about that after my initial implementation.
         movzx   rdi,BYTE [rbp-0x1]  ; socket fd
         xor     rsi,rsi             ; any addr
         xor     rdx,rdx             ; null addrlen

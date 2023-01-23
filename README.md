@@ -33,6 +33,7 @@ Future ideas:
 - Handle SIGINT to exit gracefully
 - More verbose connection logging
 - Ensure server will respond to fully-featured browsers
+- Clean up code to ensure consistent style
 
 ## Build
 ```bash
