@@ -19,7 +19,7 @@ chkrd:  ; this subroutine checks the TCP unread buffer and returns count
         lea     rdx,[rbp-267]
         mov     rsi,0x541B
         movzx   rdi,BYTE [rbp-259]
-        mov     rax,16
+        mov     rax,16                      ; operator ioctl
         syscall
         mov     rax,QWORD [rbp-267]
         ret
@@ -29,11 +29,11 @@ chkrd:  ; this subroutine checks the TCP unread buffer and returns count
 ; ; rdi: connection fd
 ; ; rsi: TIOCOUTQ (data in send queue not sent and not ack'd)
 ; ; rdx: data count
-;         mov     QWORD [rbp-267],0          ; clear previous result
+;         mov     QWORD [rbp-267],0         ; clear previous result
 ;         lea     rdx,[rbp-267]
 ;         mov     rsi,0x5411
 ;         movzx   rdi,BYTE [rbp-259]
-;         mov     rax,16
+;         mov     rax,16                    ; operator ioctl
 ;         syscall
 ;         mov     rax,QWORD [rbp-267]
 ;         ret
@@ -46,7 +46,7 @@ flush: ; this subroutine reads from the socket to /dev/null
         mov     rdx,8
         lea     rsi,[rbp-267]
         movzx   rdi,BYTE [rbp-259]
-        mov     rax,0
+        mov     rax,0                       ; operator read
         syscall
         ret
 
